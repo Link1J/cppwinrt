@@ -465,7 +465,8 @@ namespace cppwinrt
 
         if (!attribute)
         {
-            throw_invalid("'Windows.Foundation.Metadata.GuidAttribute' attribute for type '", type.TypeNamespace(), ".", type.TypeName(), "' not found");
+            //throw_invalid("'Windows.Foundation.Metadata.GuidAttribute' attribute for type '", type.TypeNamespace(), ".", type.TypeName(), "' not found");
+            return;
         }
 
         auto generics = type.GenericParam();
@@ -512,7 +513,6 @@ namespace cppwinrt
     {
         auto format = R"(    template <> struct category<%>{ using type = struct_category<%>; };
 )";
-
         w.write(format, type, bind_list(", ", type.FieldList()));
     }
 
@@ -892,7 +892,28 @@ namespace cppwinrt
             }
             else
             {
-                if (param.Flags().In())
+                if (param.Flags().In() && param.Flags().Out())
+                {
+                    w.consume_types = true;
+
+                    auto param_type = std::get_if<ElementType>(&param_signature->Type().Type());
+
+                    if (param_type && *param_type != ElementType::String && *param_type != ElementType::Object)
+                    {
+                        w.write("%", param_signature->Type());
+                    }
+                    else if (std::holds_alternative<GenericTypeIndex>(param_signature->Type().Type()))
+                    {
+                        w.write("impl::param_type<%>&", param_signature->Type());
+                    }
+                    else
+                    {
+                        w.write("%&", param_signature->Type());
+                    }
+
+                    w.consume_types = false;
+                }
+                else if (param.Flags().In())
                 {
                     assert(!param.Flags().Out());
                     w.consume_types = true;
@@ -913,6 +934,10 @@ namespace cppwinrt
                     }
 
                     w.consume_types = false;
+                }
+                else if (param.Flags().Optional())
+                {
+                    w.write("%", param_signature->Type());
                 }
                 else
                 {

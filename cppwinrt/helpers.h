@@ -777,19 +777,19 @@ namespace cppwinrt
         auto const& type = signature.Type();
         std::string name = w.write_temp("%", type);
 
-        if (starts_with(name, "struct "))
+        if (starts_with(name, "struct ") && type.ptr_count() == 0)
         {
             auto ref = std::get<coded_index<TypeDefOrRef>>(type.Type());
-
+        
             name = "struct{";
-
+        
             for (auto&& nested : find_required(ref).FieldList())
             {
                 name += " " + get_field_abi(w, nested) + " ";
                 name += nested.Name();
                 name += ";";
             }
-
+        
             name += " }";
         }
 

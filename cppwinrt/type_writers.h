@@ -1,5 +1,7 @@
 #pragma once
 
+#include <iostream>
+
 namespace cppwinrt
 {
     using namespace std::filesystem;
@@ -230,6 +232,16 @@ namespace cppwinrt
             write_printf("%#0x", value);
         }
 
+        void write_value(int64_t value)
+        {
+            write_printf("%lld", value);
+        }
+
+        void write_value(uint64_t value)
+        {
+            write_printf("%#0llx", value);
+        }
+
         void write_code(std::string_view const& value)
         {
             for (auto&& c : value)
@@ -258,6 +270,18 @@ namespace cppwinrt
                 break;
             case ConstantType::UInt32:
                 write_value(value.ValueUInt32());
+                break;
+            case ConstantType::Int16:
+                write_value(value.ValueInt16());
+                break;
+            case ConstantType::UInt16:
+                write_value(value.ValueUInt16());
+                break;
+            case ConstantType::Int64:
+                write_value(value.ValueInt64());
+                break;
+            case ConstantType::UInt64:
+                write_value(value.ValueUInt64());
                 break;
             default:
                 throw std::invalid_argument("Unexpected constant type");
@@ -507,6 +531,9 @@ namespace cppwinrt
                             write("winrt::Windows::Foundation::IInspectable");
                         }
                     }
+                    else if (type == ElementType::Void) { write("void"); }
+                    else if (type == ElementType::I) { write("intptr_t"); }
+                    else if (type == ElementType::U) { write("uintptr_t"); }
                     else
                     {
                         assert(false);
@@ -531,6 +558,10 @@ namespace cppwinrt
             else
             {
                 write(signature.Type());
+                for (int i = 0; i < signature.ptr_count(); ++i)
+                {
+                    write('*');
+                }
             }
         }
 
