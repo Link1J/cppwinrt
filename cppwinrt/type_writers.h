@@ -562,7 +562,7 @@ namespace cppwinrt
             else
             {
                 write(signature.Type());
-                for (int i = 0; i < signature.ptr_count(); ++i)
+                for (int i = (consume_types ? 0 : 0); i < signature.ptr_count(); ++i)
                 {
                     write('*');
                 }

@@ -103,6 +103,14 @@ namespace cppwinrt
             w.write_each<write_consume>(members.interfaces);
             w.write_each<write_struct_abi>(members.structs);
         }
+        {
+            auto wrap_impl = wrap_impl_functions_namespace(w);
+            auto apis = std::find_if(members.classes.begin(), members.classes.end(), [](winmd::reader::TypeDef const& clas) { return clas.TypeName() == "Apis"; });
+            if (apis != members.classes.end())
+            {
+                w.write_each<write_abi_apis>((*apis).MethodList());
+            }
+        }
 
         write_close_file_guard(w);
         w.swap();
@@ -194,6 +202,12 @@ namespace cppwinrt
             w.write_each<write_delegate_definition>(members.delegates);
             w.write_each<write_interface_override_methods>(members.classes);
             w.write_each<write_class_override>(members.classes);
+
+            auto apis = std::find_if(members.classes.begin(), members.classes.end(), [](winmd::reader::TypeDef const& clas) { return clas.TypeName() == "Apis"; });
+            if (apis != members.classes.end())
+            {
+                w.write_each<write_consume_apis>((*apis).MethodList());
+            }
         }
         {
             auto wrap_std = wrap_std_namespace(w);

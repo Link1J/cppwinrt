@@ -177,6 +177,15 @@ namespace cppwinrt
         return { w, write_close_namespace };
     }
 
+    [[nodiscard]] static finish_with wrap_impl_functions_namespace(writer& w)
+    {
+        w.write(R"(namespace winrt::impl::functions
+{
+)");
+
+        return { w, write_close_namespace };
+    }
+
     [[nodiscard]] static finish_with wrap_std_namespace(writer& w)
     {
         w.write(R"(namespace std
@@ -3341,6 +3350,32 @@ struct __declspec(empty_bases) produce_dispatch_to_overridable<T, D, %>
                 bind<write_generic_typenames>(generics),
                 type);
         }
+    }
+
+    static void write_consume_apis(writer& w, MethodDef const& method)
+    {
+        method_signature signature{ method };
+        auto format = R"(    WINRT_IMPL_AUTO(%) %(%) const noexcept
+    {
+        return winrt::impl::funcs::%(%);
+    }
+)";
+
+        w.write(format,
+            signature.return_signature(),
+            method.Name(),
+            bind<write_consume_params>(signature),
+            get_abi_name(method),
+            bind<write_abi_args<false>>(signature));
+    }
+
+
+    static void write_abi_apis(writer& w, MethodDef const& method)
+    {
+        method_signature signature{ method };
+        auto format = R"(    extern "C" % __stdcall %(%) noexcept = 0;
+)";
+        w.write(format, signature.return_signature(), get_abi_name(method), bind<write_abi_params<false>>(signature));
     }
 
     static void write_namespace_special(writer& w, std::string_view const& namespace_name)
