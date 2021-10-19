@@ -548,6 +548,7 @@ namespace cppwinrt
         }
     }
 
+    template<bool OUTPUT_ARG = true>
     static void write_abi_params(writer& w, method_signature const& method_signature)
     {
         auto abi_guard = w.push_abi_types(true);
@@ -599,7 +600,7 @@ namespace cppwinrt
             }
         }
 
-        if (method_signature.return_signature())
+        if (method_signature.return_signature() && OUTPUT_ARG)
         {
             s();
 
@@ -621,6 +622,7 @@ namespace cppwinrt
         }
     }
 
+    template<bool OUTPUT_ARG = true>
     static void write_abi_args(writer& w, method_signature const& method_signature)
     {
         separator s{ w };
@@ -683,7 +685,7 @@ namespace cppwinrt
             }
         }
 
-        if (method_signature.return_signature())
+        if (method_signature.return_signature() && OUTPUT_ARG)
         {
             s();
             auto param_name = method_signature.return_param_name();
@@ -751,7 +753,7 @@ namespace cppwinrt
             for (auto&& method : info.type.MethodList())
             {
                 method_signature signature{ method };
-                w.write(format, get_abi_name(method), bind<write_abi_params>(signature));
+                w.write(format, get_abi_name(method), bind<write_abi_params<true>>(signature));
             }
         }
     }
@@ -761,32 +763,58 @@ namespace cppwinrt
         auto generics = type.GenericParam();
         auto guard{ w.push_generic_params(generics) };
 
-        if (empty(generics))
+        auto is_winrt = get_attribute(type, "System.Runtime.InteropServices", "ComImportAttribute");
+        if (is_winrt)
         {
-            auto format = R"(    template <> struct abi<%>
+            if (empty(generics))
+            {
+                auto format = R"(    template <> struct abi<%>
     {
         struct __declspec(novtable) type : inspectable_abi
         {
 )";
 
-            w.write(format, type);
+                w.write(format, type);
+            }
+            else
+            {
+                auto format = R"(    template <%> struct abi<%>
+    {
+        struct __declspec(novtable) type : inspectable_abi
+        {
+)";
+
+                w.write(format,
+                    bind<write_generic_typenames>(generics),
+                    type);
+            }
         }
         else
         {
-            auto format = R"(    template <%> struct abi<%>
+            assert(empty(generics));
+
+            auto interfaces = get_interfaces(w, type);
+            if (interfaces.size() == 0)
+            {
+                auto format = R"(    template <> struct abi<%>
     {
-        struct __declspec(novtable) type : inspectable_abi
+        struct __declspec(novtable) type
         {
 )";
-
-            w.write(format,
-                bind<write_generic_typenames>(generics),
-                type);
+                w.write(format, type);
+            }
+            else
+            {
+                auto format = R"(    template <> struct abi<%>
+    {
+        struct __declspec(novtable) type : abi_t<%>
+        {
+)";
+                w.write(format, type, interfaces.back().first);
+            }
         }
 
 
-        auto format = R"(            virtual int32_t __stdcall %(%) noexcept = 0;
-)";
 
         auto abi_guard = w.push_abi_types(true);
         for (auto&& method : type.MethodList())
@@ -794,7 +822,24 @@ namespace cppwinrt
             try
             {
                 method_signature signature{ method };
-                w.write(format, get_abi_name(method), bind<write_abi_params>(signature));
+                if (is_winrt)
+                {
+                    auto format = R"(            virtual int32_t __stdcall %(%) noexcept = 0;
+)";
+                    w.write(format, get_abi_name(method), bind<write_abi_params<true>>(signature));
+                }
+                else if (signature.return_signature())
+                {
+                    auto format = R"(            virtual % __stdcall %(%) noexcept = 0;
+)";
+                    w.write(format, signature.return_signature(), get_abi_name(method), bind<write_abi_params<false>>(signature));
+                }
+                else
+                {
+                    auto format = R"(            virtual void __stdcall %(%) noexcept = 0;
+)";
+                    w.write(format, get_abi_name(method), bind<write_abi_params<false>>(signature));
+                }
             }
             catch (std::exception const& e)
             {
@@ -831,7 +876,7 @@ namespace cppwinrt
         w.write(format,
             bind<write_generic_typenames>(generics),
             type,
-            bind<write_abi_params>(signature));
+            bind<write_abi_params<true>>(signature));
     }
 
     static void write_field_abi(writer& w, Field const& field)
@@ -1016,13 +1061,14 @@ namespace cppwinrt
         auto async_types_guard = w.push_async_types(signature.is_async());
         auto method_name = get_name(method);
         auto type = method.Parent();
+        auto is_winrt = get_attribute(type, "System.Runtime.InteropServices", "ComImportAttribute");
 
         w.write("        %WINRT_IMPL_AUTO(%) %(%) const%;\n",
             is_get_overload(method) ? "[[nodiscard]] " : "",
             signature.return_signature(),
             method_name,
             bind<write_consume_params>(signature),
-            is_noexcept(method) ? " noexcept" : "");
+            is_noexcept(method) || !is_winrt ? " noexcept" : "");
 
         if (is_add_overload(method))
         {
@@ -1150,50 +1196,72 @@ namespace cppwinrt
         auto method_name = get_name(method);
         method_signature signature{ method };
         auto async_types_guard = w.push_async_types(signature.is_async());
+        auto is_winrt = get_attribute(type, "System.Runtime.InteropServices", "ComImportAttribute");
 
         std::string_view format;
 
-        if (is_noexcept(method))
+        if (!is_winrt)
         {
-            if (is_remove_overload(method))
+            format = R"(    template <typename D%> WINRT_IMPL_AUTO(%) consume_%<D%>::%(%) const noexcept
+    {
+        return WINRT_IMPL_SHIM(%)->%(%);
+    }
+)";
+
+            w.write(format,
+                bind<write_comma_generic_typenames>(generics),
+                signature.return_signature(),
+                type_impl_name,
+                bind<write_comma_generic_types>(generics),
+                method_name,
+                bind<write_consume_params>(signature),
+                type,
+                get_abi_name(method),
+                bind<write_abi_args<false>>(signature));
+        }
+        else {
+            if (is_noexcept(method))
             {
-                // we intentionally ignore errors when unregistering event handlers to be consistent with event_revoker
-                format = R"(    template <typename D%> WINRT_IMPL_AUTO(%) consume_%<D%>::%(%) const noexcept
+                if (is_remove_overload(method))
+                {
+                    // we intentionally ignore errors when unregistering event handlers to be consistent with event_revoker
+                    format = R"(    template <typename D%> WINRT_IMPL_AUTO(%) consume_%<D%>::%(%) const noexcept
     {%
         WINRT_IMPL_SHIM(%)->%(%);%
     }
 )";
-            }
-            else
-            {
-                format = R"(    template <typename D%> WINRT_IMPL_AUTO(%) consume_%<D%>::%(%) const noexcept
+                }
+                else
+                {
+                    format = R"(    template <typename D%> WINRT_IMPL_AUTO(%) consume_%<D%>::%(%) const noexcept
     {%
         WINRT_VERIFY_(0, WINRT_IMPL_SHIM(%)->%(%));%
     }
 )";
+                }
             }
-        }
-        else
-        {
-            format = R"(    template <typename D%> WINRT_IMPL_AUTO(%) consume_%<D%>::%(%) const
+            else
+            {
+                format = R"(    template <typename D%> WINRT_IMPL_AUTO(%) consume_%<D%>::%(%) const
     {%
         check_hresult(WINRT_IMPL_SHIM(%)->%(%));%
     }
 )";
-        }
+            }
 
-        w.write(format,
-            bind<write_comma_generic_typenames>(generics),
-            signature.return_signature(),
-            type_impl_name,
-            bind<write_comma_generic_types>(generics),
-            method_name,
-            bind<write_consume_params>(signature),
-            bind<write_consume_return_type>(signature, false),
-            type,
-            get_abi_name(method),
-            bind<write_abi_args>(signature),
-            bind<write_consume_return_statement>(signature));
+            w.write(format,
+                bind<write_comma_generic_typenames>(generics),
+                signature.return_signature(),
+                type_impl_name,
+                bind<write_comma_generic_types>(generics),
+                method_name,
+                bind<write_consume_params>(signature),
+                bind<write_consume_return_type>(signature, false),
+                type,
+                get_abi_name(method),
+                bind<write_abi_args<true>>(signature),
+                bind<write_consume_return_statement>(signature));
+        }
 
         if (is_add_overload(method))
         {
@@ -2537,7 +2605,7 @@ struct __declspec(empty_bases) produce_dispatch_to_overridable<T, D, %>
             type,
             type,
             type,
-            bind<write_abi_params>(signature),
+            bind<write_abi_params<true>>(signature),
             bind<write_produce_cleanup>(signature),
             bind<write_produce_upcall>("(*this)", signature));
     }
@@ -2614,7 +2682,7 @@ struct __declspec(empty_bases) produce_dispatch_to_overridable<T, D, %>
                 bind<write_consume_return_type>(signature, true),
                 type_name,
                 bind_list(", ", generics),
-                bind<write_abi_args>(signature),
+                bind<write_abi_args<true>>(signature),
                 bind<write_consume_return_statement>(signature));
         }
         else
@@ -2666,7 +2734,7 @@ struct __declspec(empty_bases) produce_dispatch_to_overridable<T, D, %>
                 bind<write_consume_params>(signature),
                 bind<write_consume_return_type>(signature, true),
                 type_name,
-                bind<write_abi_args>(signature),
+                bind<write_abi_args<true>>(signature),
                 bind<write_consume_return_statement>(signature));
         }
     }

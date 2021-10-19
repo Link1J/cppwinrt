@@ -311,6 +311,10 @@ namespace cppwinrt
             {
                 write("winrt::hresult");
             }
+            else if (name == "HRESULT" && ns == "Windows.Win32.Foundation")
+            {
+                write("winrt::hresult");
+            }
             else if (abi_types)
             {
                 auto category = get_category(type);
