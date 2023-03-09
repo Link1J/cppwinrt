@@ -2,9 +2,13 @@
 #if defined(_MSC_VER)
 #include <intrin.h>
 #else
-#define _MSC_VER 1
-#include <intrin.h>
-#undef _MSC_VER
+#if defined(__i386__) || defined(__x86_64__)
+#include <x86intrin.h>
+#elif defined(__arm__)
+#include <armintr.h>
+#elif defined(__aarch64__)
+#include <arm64intr.h>
+#endif
 #endif
 
 #include <algorithm>
