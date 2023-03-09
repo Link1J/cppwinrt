@@ -1,5 +1,12 @@
 
+#if defined(_MSC_VER)
 #include <intrin.h>
+#else
+#define _MSC_VER 1
+#include <intrin.h>
+#undef _MSC_VER
+#endif
+
 #include <algorithm>
 #include <array>
 #include <atomic>
@@ -12,8 +19,8 @@
 #include <memory>
 #include <optional>
 #include <stdexcept>
-#include <string_view>
 #include <string>
+#include <string_view>
 #include <thread>
 #include <tuple>
 #include <type_traits>
@@ -48,12 +55,11 @@
 
 namespace winrt::impl
 {
-    template <typename T = void>
-    using coroutine_handle = std::coroutine_handle<T>;
+template <typename T = void> using coroutine_handle = std::coroutine_handle<T>;
 
-    using suspend_always = std::suspend_always;
-    using suspend_never = std::suspend_never;
-}
+using suspend_always = std::suspend_always;
+using suspend_never = std::suspend_never;
+} // namespace winrt::impl
 
 #elif __has_include(<experimental/coroutine>)
 
@@ -61,12 +67,11 @@ namespace winrt::impl
 
 namespace winrt::impl
 {
-    template <typename T = void>
-    using coroutine_handle = std::experimental::coroutine_handle<T>;
+template <typename T = void> using coroutine_handle = std::experimental::coroutine_handle<T>;
 
-    using suspend_always = std::experimental::suspend_always;
-    using suspend_never = std::experimental::suspend_never;
-}
+using suspend_always = std::experimental::suspend_always;
+using suspend_never = std::experimental::suspend_never;
+} // namespace winrt::impl
 
 #else
 #error C++/WinRT requires coroutine support, which is currently missing. Try enabling C++20 in your compiler.
