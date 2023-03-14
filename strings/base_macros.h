@@ -1,5 +1,5 @@
 
-#if defined(__GNUC__) && !defined(_MSC_VER)
+#if defined(__GNUC__) && !defined(_MSC_VER) && !defined(__MINGW32__)
 #define WINRT_NOT_ON_WINDOWS
 
 #ifdef __i386__
@@ -19,9 +19,27 @@
 #define _WIN64
 #endif
 
+#ifndef __has_attribute
+#define __has_attribute(x) 0
+#endif
+#ifndef __is_identifier
+#define __is_identifier(x) 0
+#endif
+
+#if !__is_identifier(__declspec)
 #define __declspec(...) __attribute__((__VA_ARGS__))
-#define __pragma _Pragma
+#if __has_attribute(selectany)
 #define selectany weak
+#endif
+#endif  
+
+#if !__is_identifier(__pragma)
+#define __pragma _Pragma
+#endif
+
+#if !__is_identifier(__stdcall) && __has_attribute(stdcall)
+#define __stdcall __attribute__((stdcall))
+#endif
 
 #define memcpy_s(a, b, c, d) memcpy(a, c, d)
 #define swprintf_s(a, c, ...) swprintf(a, sizeof a / sizeof *a, c, __VA_ARGS__)
@@ -32,7 +50,8 @@
 
 #define _InterlockedIncrement64(a) __sync_add_and_fetch(a, 1)
 #define _InterlockedDecrement64(a) __sync_fetch_and_sub(a, 1)
-#define _InterlockedCompareExchange128(a, b1, b2, c) __sync_val_compare_and_swap((__int128_t*)a, *(__int128_t*)c, (__int128_t)b1 << 64 | b2)
+#define _InterlockedCompareExchange128(a, b1, b2, c)                                                                   \
+    __sync_val_compare_and_swap((__int128_t *)a, *(__int128_t *)c, (__int128_t)b1 << 64 | b2)
 
 #define _InterlockedCompareExchangePointer(a, b, c) __sync_val_compare_and_swap(a, c, b)
 
@@ -56,7 +75,7 @@
 
 #endif
 
-#define WINRT_IMPL_SHIM(...) (*(abi_t<__VA_ARGS__>**)&static_cast<__VA_ARGS__ const&>(static_cast<D const&>(*this)))
+#define WINRT_IMPL_SHIM(...) (*(abi_t<__VA_ARGS__> **)&static_cast<__VA_ARGS__ const &>(static_cast<D const &>(*this)))
 
 #ifdef _MSC_VER
 // Note: this is a workaround for a false-positive warning produced by the Visual C++ 15.9 compiler.
@@ -120,17 +139,21 @@ struct IUnknown;
 typedef struct _GUID GUID;
 #endif
 
-// std::source_location is a C++20 feature, which is above the C++17 feature floor for cppwinrt.  The source location needs
-// to be the calling code, not cppwinrt itself, so that it is useful to developers building on top of this library.  As a
-// result any public-facing method that can result in an error needs a default-constructed source_location argument.  Because
-// this type does not exist in C++17 we need to use a macro to optionally add parameters and forwarding wherever appropriate.
+// std::source_location is a C++20 feature, which is above the C++17 feature floor for cppwinrt.  The source location
+// needs to be the calling code, not cppwinrt itself, so that it is useful to developers building on top of this
+// library.  As a result any public-facing method that can result in an error needs a default-constructed
+// source_location argument.  Because this type does not exist in C++17 we need to use a macro to optionally add
+// parameters and forwarding wherever appropriate.
 //
-// Some projects may decide to disable std::source_location support to prevent source code information from ending up in their
-// release binaries, or to reduce binary size.  Defining WINRT_NO_SOURCE_LOCATION will prevent this feature from activating.
+// Some projects may decide to disable std::source_location support to prevent source code information from ending up in
+// their release binaries, or to reduce binary size.  Defining WINRT_NO_SOURCE_LOCATION will prevent this feature from
+// activating.
 #if defined(__cpp_lib_source_location) && !defined(WINRT_NO_SOURCE_LOCATION)
-#define WINRT_IMPL_SOURCE_LOCATION_ARGS_NO_DEFAULT , std::source_location const& sourceInformation
-#define WINRT_IMPL_SOURCE_LOCATION_ARGS , std::source_location const& sourceInformation = std::source_location::current()
-#define WINRT_IMPL_SOURCE_LOCATION_ARGS_SINGLE_PARAM std::source_location const& sourceInformation = std::source_location::current()
+#define WINRT_IMPL_SOURCE_LOCATION_ARGS_NO_DEFAULT , std::source_location const &sourceInformation
+#define WINRT_IMPL_SOURCE_LOCATION_ARGS                                                                                \
+    , std::source_location const &sourceInformation = std::source_location::current()
+#define WINRT_IMPL_SOURCE_LOCATION_ARGS_SINGLE_PARAM                                                                   \
+    std::source_location const &sourceInformation = std::source_location::current()
 
 #define WINRT_IMPL_SOURCE_LOCATION_FORWARD , sourceInformation
 #define WINRT_IMPL_SOURCE_LOCATION_FORWARD_SINGLE_PARAM sourceInformation
