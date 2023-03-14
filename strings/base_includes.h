@@ -1,5 +1,5 @@
 
-#if defined(_MSC_VER)
+#if defined(_MSC_VER) || defined(__MINGW32__)
 #include <intrin.h>
 #else
 #if defined(__i386__) || defined(__x86_64__)
