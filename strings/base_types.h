@@ -211,8 +211,13 @@ WINRT_EXPORT namespace winrt::Windows::Foundation
 namespace winrt::impl
 {
 #ifdef WINRT_IMPL_IUNKNOWN_DEFINED
+#ifdef _WIN32
     using hresult_type = long;
     using count_type = unsigned long;
+#else
+    using hresult_type = int32_t;
+    using count_type = uint32_t;
+#endif 
     using guid_type = GUID;
 #else
     using hresult_type = int32_t;
