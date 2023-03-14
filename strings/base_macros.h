@@ -22,22 +22,17 @@
 #ifndef __has_attribute
 #define __has_attribute(x) 0
 #endif
-#ifndef __is_identifier
-#define __is_identifier(x) 0
-#endif
 
-#if !__is_identifier(__declspec)
+#if !__has_declspec_attribute(selectany)
 #define __declspec(...) __attribute__((__VA_ARGS__))
-#if __has_attribute(selectany)
 #define selectany weak
 #endif
-#endif  
 
 #if !__is_identifier(__pragma)
 #define __pragma _Pragma
 #endif
 
-#if !__is_identifier(__stdcall) && __has_attribute(stdcall)
+#if !__is_identifier(__stdcall) && __has_attribute(stdcall) && !defined(__stdcall)
 #define __stdcall __attribute__((stdcall))
 #endif
 
@@ -73,7 +68,7 @@
 
 #endif
 
-#define WINRT_IMPL_SHIM(...) (*(abi_t<__VA_ARGS__> **)&static_cast<__VA_ARGS__ const &>(static_cast<D const &>(*this)))
+#define WINRT_IMPL_SHIM(...) (*(abi_t<__VA_ARGS__>**)&static_cast<__VA_ARGS__ const&>(static_cast<D const&>(*this)))
 
 #ifdef _MSC_VER
 // Note: this is a workaround for a false-positive warning produced by the Visual C++ 15.9 compiler.
@@ -147,11 +142,9 @@ typedef struct _GUID GUID;
 // their release binaries, or to reduce binary size.  Defining WINRT_NO_SOURCE_LOCATION will prevent this feature from
 // activating.
 #if defined(__cpp_lib_source_location) && !defined(WINRT_NO_SOURCE_LOCATION)
-#define WINRT_IMPL_SOURCE_LOCATION_ARGS_NO_DEFAULT , std::source_location const &sourceInformation
-#define WINRT_IMPL_SOURCE_LOCATION_ARGS                                                                                \
-    , std::source_location const &sourceInformation = std::source_location::current()
-#define WINRT_IMPL_SOURCE_LOCATION_ARGS_SINGLE_PARAM                                                                   \
-    std::source_location const &sourceInformation = std::source_location::current()
+#define WINRT_IMPL_SOURCE_LOCATION_ARGS_NO_DEFAULT , std::source_location const& sourceInformation
+#define WINRT_IMPL_SOURCE_LOCATION_ARGS , std::source_location const& sourceInformation = std::source_location::current()
+#define WINRT_IMPL_SOURCE_LOCATION_ARGS_SINGLE_PARAM std::source_location const& sourceInformation = std::source_location::current()
 
 #define WINRT_IMPL_SOURCE_LOCATION_FORWARD , sourceInformation
 #define WINRT_IMPL_SOURCE_LOCATION_FORWARD_SINGLE_PARAM sourceInformation
