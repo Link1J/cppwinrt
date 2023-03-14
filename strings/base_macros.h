@@ -50,8 +50,6 @@
 
 #define _InterlockedIncrement64(a) __sync_add_and_fetch(a, 1)
 #define _InterlockedDecrement64(a) __sync_fetch_and_sub(a, 1)
-#define _InterlockedCompareExchange128(a, b1, b2, c)                                                                   \
-    __sync_val_compare_and_swap((__int128_t *)a, *(__int128_t *)c, (__int128_t)b1 << 64 | b2)
 
 #define _InterlockedCompareExchangePointer(a, b, c) __sync_val_compare_and_swap(a, c, b)
 
